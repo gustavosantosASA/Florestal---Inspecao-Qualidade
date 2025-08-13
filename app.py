@@ -63,7 +63,7 @@ def authenticate_google_services():
 def upload_file_to_drive(drive_service, file_object):
     try:
         # !! IMPORTANTE !! Use o ID da pasta que está DENTRO do Drive Compartilhado
-        DRIVE_FOLDER_ID = "19D3iEcXDS__dpt-0F70GiL_P-4_bCsMV"
+        DRIVE_FOLDER_ID = "0AFP5U55axe3sUk9PVA"
 
         file_metadata = {
             'name': file_object.name,
@@ -110,7 +110,7 @@ def submit_data(data_row, fotos_carregadas, gspread_client, drive_service):
         
         return True, None
     except Exception as e: return False, str(e)
-    
+
 def render_step_1():
     st.subheader("Etapa 1: Identificação da Inspeção")
     with st.form("step1_form"):
