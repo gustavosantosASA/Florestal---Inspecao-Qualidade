@@ -150,7 +150,7 @@ def authenticate_google_services():
 
 def upload_file_to_drive(drive_service, file_object):
     try:
-        DRIVE_FOLDER_ID = "1g6k6yq1dI1T-X_YcZ3aB5fH4jKl2mN9o"
+        DRIVE_FOLDER_ID = "0AFP5U55axe3sUk9PVA"
         file_metadata = {'name': file_object.name, 'parents': [DRIVE_FOLDER_ID]}
         media = MediaIoBaseUpload(io.BytesIO(file_object.getvalue()), mimetype=file_object.type, resumable=True)
         file = drive_service.files().create(body=file_metadata, media_body=media, fields='id, webViewLink', supportsAllDrives=True).execute()
