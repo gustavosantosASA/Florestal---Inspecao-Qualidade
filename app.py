@@ -6,9 +6,9 @@ from datetime import datetime
 from PIL import Image
 import io
 
-# Importações para o Google Drive e autenticação
-from pydrive2.auth import GoogleAuth
-from pydrive2.drive import GoogleDrive
+# Importações da biblioteca base do Google para o Drive
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaIoBaseUpload
 
 # --- CONFIGURAÇÃO DA PÁGINA (sem mudanças) ---
 try:
@@ -47,57 +47,56 @@ def load_custom_css():
 if 'current_step' not in st.session_state: st.session_state.current_step = 1
 if 'form_data' not in st.session_state: st.session_state.form_data = {}
 
-# --- FUNÇÕES DE BACKEND (LÓGICA DE AUTENTICAÇÃO ATUALIZADA) ---
+# --- FUNÇÕES DE BACKEND (LÓGICA DE AUTENTICAÇÃO E UPLOAD CORRIGIDA) ---
 
 def authenticate_google_services():
-    """Cria e retorna clientes autorizados para o gspread e o GoogleDrive."""
+    """Cria e retorna clientes autorizados para o gspread e o Google Drive."""
     SCOPES = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
     creds_dict = dict(st.secrets["gcp_service_account"])
     creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
     
-    # Autoriza o cliente gspread (continua igual)
     gspread_client = gspread.authorize(creds)
-    
-    # --- CORREÇÃO AQUI ---
-    # Autentica o PyDrive2 da maneira correta
-    gauth = GoogleAuth()
-    gauth.credentials = creds  # Atribui as credenciais diretamente
-    drive_client = GoogleDrive(gauth)
+    drive_service = build('drive', 'v3', credentials=creds)
 
-    return gspread_client, drive_client
+    return gspread_client, drive_service
 
-def upload_file_to_drive(drive_client, file_object):
-    """Faz o upload de um objeto de arquivo para o Google Drive."""
+def upload_file_to_drive(drive_service, file_object):
+    """Faz o upload de um objeto de arquivo para o Google Drive usando a API base."""
     try:
         # !! IMPORTANTE !! SUBSTITUA PELO ID DA SUA PASTA DO GOOGLE DRIVE!
-        DRIVE_FOLDER_ID = "1g6k6yq1dI1T-X_YcZ3aB5fH4jKl2mN9o" 
+        DRIVE_FOLDER_ID = "1g6k6yq1dI1T-X_YcZ3aB5fH4jKl2mN9o"
 
-        file_object.seek(0)
-        file_bytes = io.BytesIO(file_object.read())
+        file_metadata = {
+            'name': file_object.name,
+            'parents': [DRIVE_FOLDER_ID]
+        }
         
-        drive_file = drive_client.CreateFile({
-            'title': file_object.name,
-            'parents': [{'id': DRIVE_FOLDER_ID}],
-            'mimeType': file_object.type
-        })
-        drive_file.content = file_bytes
-        drive_file.Upload()
-        drive_file.InsertPermission({'type': 'anyone', 'role': 'reader', 'value': 'anyone'})
-        return drive_file['alternateLink']
+        media = MediaIoBaseUpload(io.BytesIO(file_object.getvalue()),
+                                  mimetype=file_object.type,
+                                  resumable=True)
+        
+        file = drive_service.files().create(body=file_metadata,
+                                            media_body=media,
+                                            fields='id, webViewLink').execute()
+        
+        file_id = file.get('id')
+        # Torna o arquivo público para qualquer pessoa com o link
+        drive_service.permissions().create(fileId=file_id, body={'type': 'anyone', 'role': 'reader'}).execute()
+        
+        return file.get('webViewLink')
     except Exception as e:
         st.error(f"Erro no upload para o Drive: {e}")
         return None
 
-def submit_data(data_row, fotos_carregadas, gspread_client, drive_client):
+def submit_data(data_row, fotos_carregadas, gspread_client, drive_service):
     """Coordena o upload para o Drive e o envio para o Sheets."""
     try:
         links_das_fotos = []
         if fotos_carregadas:
             with st.spinner("Fazendo upload das imagens para o Google Drive..."):
                 for foto in fotos_carregadas:
-                    link = upload_file_to_drive(drive_client, foto)
-                    if link:
-                        links_das_fotos.append(link)
+                    link = upload_file_to_drive(drive_service, foto)
+                    if link: links_das_fotos.append(link)
         
         data_row[-1] = ", ".join(links_das_fotos) if links_das_fotos else "Nenhuma foto enviada"
 
@@ -106,10 +105,9 @@ def submit_data(data_row, fotos_carregadas, gspread_client, drive_client):
             sh.append_row(data_row)
         
         return True, None
-    except Exception as e:
-        return False, str(e)
+    except Exception as e: return False, str(e)
 
-# --- FUNÇÕES PARA RENDERIZAR CADA ETAPA (Lógica de submissão ajustada) ---
+# --- FUNÇÕES PARA RENDERIZAR AS ETAPAS (sem mudanças) ---
 
 def render_step_1():
     st.subheader("Etapa 1: Identificação da Inspeção")
@@ -173,9 +171,8 @@ def render_step_3():
             now = datetime.now()
             final_data_row = [now.isoformat(), now.strftime("%Y-%m-%d"), now.strftime("%H:%M:%S"), st.session_state.form_data.get('email'), st.session_state.form_data.get('responsavel'), st.session_state.form_data.get('lote'), st.session_state.form_data.get('plaina'), st.session_state.form_data.get('enfardamento_pecas'), st.session_state.form_data.get('enfardamento_dimensoes'), st.session_state.form_data.get('e1'), st.session_state.form_data.get('e2'), st.session_state.form_data.get('e3'), st.session_state.form_data.get('l1'), st.session_state.form_data.get('l2'), st.session_state.form_data.get('l3'), st.session_state.form_data.get('comprimento'), st.session_state.form_data.get('umidade'), azulamento, tortuosidade, no_morto, esmoado, no_gravata, marcas, pontuacao, "placeholder_para_fotos"]
             
-            # Chama a nova função de envio unificada
-            gspread_client, drive_client = authenticate_google_services()
-            success, error_message = submit_data(final_data_row, fotos_carregadas, gspread_client, drive_client)
+            gspread_client, drive_service = authenticate_google_services()
+            success, error_message = submit_data(final_data_row, fotos_carregadas, gspread_client, drive_service)
             
             if success:
                 st.session_state.current_step = 4; del st.session_state.form_data; st.rerun()
