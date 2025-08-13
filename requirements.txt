@@ -3,3 +3,5 @@ gspread
 google-auth-oauthlib
 Pillow
 PyDrive2
+google-api-python-client # Adicionado
+google-auth-httplib2 # Adicionado
