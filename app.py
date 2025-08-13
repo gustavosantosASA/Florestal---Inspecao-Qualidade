@@ -106,14 +106,18 @@ if 'form_data' not in st.session_state:
 def submit_data_to_sheets(data):
     try:
         SCOPES = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
-        # Linha que lê as credenciais do Streamlit Cloud Secrets:
-        creds = Credentials.from_service_account_info(st.secrets, scopes=SCOPES)
+        
+        # Converte o "Secret" do Streamlit para um dicionário Python padrão
+        creds_dict = dict(st.secrets["gcp_service_account"])
+        
+        # Passa o dicionário para a função de credenciais
+        creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
+        
         gc = gspread.authorize(creds)
         sh = gc.open_by_key("1cG1KTzTUTf6A_DhWC6NIwRdAdLjaCTUYr9VgS4X03fU").worksheet("Base")
         sh.append_row(data)
         return True, None
     except Exception as e:
-        # Erro mais genérico para cobrir falhas de conexão ou autenticação
         return False, str(e)
 
 # --- FUNÇÕES PARA RENDERIZAR CADA ETAPA (sem mudanças na lógica) ---
