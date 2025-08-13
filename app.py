@@ -6,10 +6,9 @@ from datetime import datetime
 from PIL import Image
 import io
 
-# Novas e atualizadas importações para autenticação unificada
+# Importações para o Google Drive e autenticação
+from pydrive2.auth import GoogleAuth
 from pydrive2.drive import GoogleDrive
-from googleapiclient.discovery import build
-from google.auth.transport.requests import Request
 
 # --- CONFIGURAÇÃO DA PÁGINA (sem mudanças) ---
 try:
@@ -56,26 +55,26 @@ def authenticate_google_services():
     creds_dict = dict(st.secrets["gcp_service_account"])
     creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
     
-    # Autoriza o cliente gspread
+    # Autoriza o cliente gspread (continua igual)
     gspread_client = gspread.authorize(creds)
     
-    # Constrói o serviço do Google Drive para a PyDrive2
-    drive_service = build('drive', 'v3', credentials=creds)
-    drive_client = GoogleDrive(google_auth_client=drive_service)
+    # --- CORREÇÃO AQUI ---
+    # Autentica o PyDrive2 da maneira correta
+    gauth = GoogleAuth()
+    gauth.credentials = creds  # Atribui as credenciais diretamente
+    drive_client = GoogleDrive(gauth)
 
     return gspread_client, drive_client
 
 def upload_file_to_drive(drive_client, file_object):
-    """Faz o upload de um objeto de arquivo para o Google Drive usando um cliente já autorizado."""
+    """Faz o upload de um objeto de arquivo para o Google Drive."""
     try:
         # !! IMPORTANTE !! SUBSTITUA PELO ID DA SUA PASTA DO GOOGLE DRIVE!
-        DRIVE_FOLDER_ID = "SEU_ID_DA_PASTA_AQUI"
+        DRIVE_FOLDER_ID = "1g6k6yq1dI1T-X_YcZ3aB5fH4jKl2mN9o" 
 
-        # Converte o objeto de arquivo do Streamlit para um que o PyDrive2 entenda
         file_object.seek(0)
         file_bytes = io.BytesIO(file_object.read())
         
-        # Cria o arquivo no Google Drive
         drive_file = drive_client.CreateFile({
             'title': file_object.name,
             'parents': [{'id': DRIVE_FOLDER_ID}],
@@ -83,10 +82,7 @@ def upload_file_to_drive(drive_client, file_object):
         })
         drive_file.content = file_bytes
         drive_file.Upload()
-        
-        # Define a permissão para que qualquer pessoa com o link possa ver
         drive_file.InsertPermission({'type': 'anyone', 'role': 'reader', 'value': 'anyone'})
-
         return drive_file['alternateLink']
     except Exception as e:
         st.error(f"Erro no upload para o Drive: {e}")
@@ -97,15 +93,17 @@ def submit_data(data_row, fotos_carregadas, gspread_client, drive_client):
     try:
         links_das_fotos = []
         if fotos_carregadas:
-            for foto in fotos_carregadas:
-                link = upload_file_to_drive(drive_client, foto)
-                if link:
-                    links_das_fotos.append(link)
+            with st.spinner("Fazendo upload das imagens para o Google Drive..."):
+                for foto in fotos_carregadas:
+                    link = upload_file_to_drive(drive_client, foto)
+                    if link:
+                        links_das_fotos.append(link)
         
         data_row[-1] = ", ".join(links_das_fotos) if links_das_fotos else "Nenhuma foto enviada"
 
-        sh = gspread_client.open_by_key("1cG1KTzTUTf6A_DhWC6NIwRdAdLjaCTUYr9VgS4X03fU").worksheet("Base")
-        sh.append_row(data_row)
+        with st.spinner("Enviando dados para a planilha..."):
+            sh = gspread_client.open_by_key("1cG1KTzTUTf6A_DhWC6NIwRdAdLjaCTUYr9VgS4X03fU").worksheet("Base")
+            sh.append_row(data_row)
         
         return True, None
     except Exception as e:
@@ -168,21 +166,20 @@ def render_step_3():
         nav_cols = st.columns([1, 6, 2])
         if nav_cols[0].form_submit_button("⬅️ Voltar"): st.session_state.current_step = 2; st.rerun()
         if nav_cols[2].form_submit_button("✔️ SUBMETER INSPEÇÃO"):
-            with st.spinner("Enviando dados e fazendo upload das imagens... Por favor, aguarde."):
-                fotos_carregadas = []
-                if foto_camera:
-                    foto_camera.name = f"foto_camera_{datetime.now().strftime('%Y%m%d_%H%M%S')}.jpg"; fotos_carregadas.append(foto_camera)
-                if fotos_galeria: fotos_carregadas.extend(fotos_galeria)
-                now = datetime.now()
-                final_data_row = [now.isoformat(), now.strftime("%Y-%m-%d"), now.strftime("%H:%M:%S"), st.session_state.form_data.get('email'), st.session_state.form_data.get('responsavel'), st.session_state.form_data.get('lote'), st.session_state.form_data.get('plaina'), st.session_state.form_data.get('enfardamento_pecas'), st.session_state.form_data.get('enfardamento_dimensoes'), st.session_state.form_data.get('e1'), st.session_state.form_data.get('e2'), st.session_state.form_data.get('e3'), st.session_state.form_data.get('l1'), st.session_state.form_data.get('l2'), st.session_state.form_data.get('l3'), st.session_state.form_data.get('comprimento'), st.session_state.form_data.get('umidade'), azulamento, tortuosidade, no_morto, esmoado, no_gravata, marcas, pontuacao, "placeholder_para_fotos"]
-                
-                # Chama a nova função de envio unificada
-                gspread_client, drive_client = authenticate_google_services()
-                success, error_message = submit_data(final_data_row, fotos_carregadas, gspread_client, drive_client)
-                
-                if success:
-                    st.session_state.current_step = 4; del st.session_state.form_data; st.rerun()
-                else: st.error(f"Falha ao enviar os dados: {error_message}")
+            fotos_carregadas = []
+            if foto_camera:
+                foto_camera.name = f"foto_camera_{datetime.now().strftime('%Y%m%d_%H%M%S')}.jpg"; fotos_carregadas.append(foto_camera)
+            if fotos_galeria: fotos_carregadas.extend(fotos_galeria)
+            now = datetime.now()
+            final_data_row = [now.isoformat(), now.strftime("%Y-%m-%d"), now.strftime("%H:%M:%S"), st.session_state.form_data.get('email'), st.session_state.form_data.get('responsavel'), st.session_state.form_data.get('lote'), st.session_state.form_data.get('plaina'), st.session_state.form_data.get('enfardamento_pecas'), st.session_state.form_data.get('enfardamento_dimensoes'), st.session_state.form_data.get('e1'), st.session_state.form_data.get('e2'), st.session_state.form_data.get('e3'), st.session_state.form_data.get('l1'), st.session_state.form_data.get('l2'), st.session_state.form_data.get('l3'), st.session_state.form_data.get('comprimento'), st.session_state.form_data.get('umidade'), azulamento, tortuosidade, no_morto, esmoado, no_gravata, marcas, pontuacao, "placeholder_para_fotos"]
+            
+            # Chama a nova função de envio unificada
+            gspread_client, drive_client = authenticate_google_services()
+            success, error_message = submit_data(final_data_row, fotos_carregadas, gspread_client, drive_client)
+            
+            if success:
+                st.session_state.current_step = 4; del st.session_state.form_data; st.rerun()
+            else: st.error(f"Falha ao enviar os dados: {error_message}")
 
 def render_success_step():
     st.success("🎉 Inspeção registrada com sucesso!"); st.balloons()
