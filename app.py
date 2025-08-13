@@ -61,27 +61,32 @@ def authenticate_google_services():
     return gspread_client, drive_service
 
 def upload_file_to_drive(drive_service, file_object):
-    """Faz o upload de um objeto de arquivo para o Google Drive usando a API base."""
     try:
-        # !! IMPORTANTE !! SUBSTITUA PELO ID DA SUA PASTA DO GOOGLE DRIVE!
+        # !! IMPORTANTE !! Use o ID da pasta que está DENTRO do Drive Compartilhado
         DRIVE_FOLDER_ID = "19D3iEcXDS__dpt-0F70GiL_P-4_bCsMV"
 
         file_metadata = {
             'name': file_object.name,
             'parents': [DRIVE_FOLDER_ID]
         }
+        media = MediaIoBaseUpload(io.BytesIO(file_object.getvalue()), mimetype=file_object.type, resumable=True)
         
-        media = MediaIoBaseUpload(io.BytesIO(file_object.getvalue()),
-                                  mimetype=file_object.type,
-                                  resumable=True)
+        # --- MUDANÇA PRINCIPAL AQUI ---
+        # Adicionamos 'supportsAllDrives=True' para informar a API que estamos usando um Drive Compartilhado
+        file = drive_service.files().create(
+            body=file_metadata,
+            media_body=media,
+            fields='id, webViewLink',
+            supportsAllDrives=True  # <-- Parâmetro essencial para Drives Compartilhados
+        ).execute()
         
-        file = drive_service.files().create(body=file_metadata,
-                                            media_body=media,
-                                            fields='id, webViewLink').execute()
-        
+        # A permissão 'anyone' já funciona em arquivos de Drives Compartilhados se as políticas permitirem
         file_id = file.get('id')
-        # Torna o arquivo público para qualquer pessoa com o link
-        drive_service.permissions().create(fileId=file_id, body={'type': 'anyone', 'role': 'reader'}).execute()
+        drive_service.permissions().create(
+            fileId=file_id, 
+            body={'type': 'anyone', 'role': 'reader'},
+            supportsAllDrives=True # <-- Adicionar aqui também por segurança
+        ).execute()
         
         return file.get('webViewLink')
     except Exception as e:
@@ -89,7 +94,6 @@ def upload_file_to_drive(drive_service, file_object):
         return None
 
 def submit_data(data_row, fotos_carregadas, gspread_client, drive_service):
-    """Coordena o upload para o Drive e o envio para o Sheets."""
     try:
         links_das_fotos = []
         if fotos_carregadas:
@@ -106,9 +110,7 @@ def submit_data(data_row, fotos_carregadas, gspread_client, drive_service):
         
         return True, None
     except Exception as e: return False, str(e)
-
-# --- FUNÇÕES PARA RENDERIZAR AS ETAPAS (sem mudanças) ---
-
+    
 def render_step_1():
     st.subheader("Etapa 1: Identificação da Inspeção")
     with st.form("step1_form"):
