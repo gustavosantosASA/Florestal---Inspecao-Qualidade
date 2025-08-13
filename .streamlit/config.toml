@@ -1,0 +1,17 @@
+# .streamlit/config.toml
+
+[theme]
+# Cor primária, nosso verde corporativo
+primaryColor="#20643F"
+
+# Cor de fundo principal, um branco gelo sutil
+backgroundColor="#F5F5F5"
+
+# Cor de fundo de áreas secundárias
+secondaryBackgroundColor="#E0E0E0"
+
+# Cor do texto principal
+textColor="#1a1a1a"
+
+# Fonte principal da aplicação
+font="sans serif"
