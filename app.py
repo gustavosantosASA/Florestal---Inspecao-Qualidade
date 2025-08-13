@@ -64,7 +64,7 @@ def upload_file_to_drive(drive_service, file_object):
     """Faz o upload de um objeto de arquivo para o Google Drive usando a API base."""
     try:
         # !! IMPORTANTE !! SUBSTITUA PELO ID DA SUA PASTA DO GOOGLE DRIVE!
-        DRIVE_FOLDER_ID = "1g6k6yq1dI1T-X_YcZ3aB5fH4jKl2mN9o"
+        DRIVE_FOLDER_ID = "19D3iEcXDS__dpt-0F70GiL_P-4_bCsMV"
 
         file_metadata = {
             'name': file_object.name,
