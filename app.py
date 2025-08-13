@@ -22,11 +22,12 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# --- FUNÇÃO CSS ATUALIZADA (Sua versão) ---
+# --- FUNÇÃO CSS ATUALIZADA ---
 def load_custom_css():
     primary_color = "#20643F"
-    secondary_color = "#1B4E33" # Um verde mais escuro para o hover
-    background_color = "#F9FAF9" # Um branco gelo bem sutil
+    secondary_color = "#1B4E33"
+    background_color = "#F9FAF9"
+    text_color = "#31333F"  # <-- CORREÇÃO APLICADA AQUI
 
     st.markdown(f"""
         <style>
@@ -161,7 +162,7 @@ def render_step_2():
         with col2:
             st.markdown("**Largura (L)**"); l1 = st.number_input("L1 (mm) Entrada da plaina", value=st.session_state.form_data.get('l1', 0.0), format="%.2f", step=0.01)
             l2 = st.number_input("L2 (mm) Meio da tabua", value=st.session_state.form_data.get('l2', 0.0), format="%.2f", step=0.01)
-            l3 = st.number_input("L3 (mm) Saída da plaina", valuest.session_state.form_data.get('l3', 0.0), format="%.2f", step=0.01)
+            l3 = st.number_input("L3 (mm) Saída da plaina", value=st.session_state.form_data.get('l3', 0.0), format="%.2f", step=0.01)
         with col3:
             st.markdown("**Comprimento e Umidade**"); comprimento = st.number_input("Comprimento (mm)", value=st.session_state.form_data.get('comprimento', 0.0), format="%.2f", step=0.01)
             umidade = st.number_input("Umidade (8% a 16%)", value=st.session_state.form_data.get('umidade', 0.0), min_value=0.0, max_value=100.0, format="%.1f", step=0.1)
