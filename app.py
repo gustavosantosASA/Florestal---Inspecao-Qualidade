@@ -4,22 +4,28 @@ import gspread
 from google.oauth2.service_account import Credentials
 from datetime import datetime
 from PIL import Image
-# Novas importações para o Google Drive
+# Bibliotecas para o Google Drive
 from pydrive2.auth import GoogleAuth
 from pydrive2.drive import GoogleDrive
 import io
 
-# --- CONFIGURAÇÃO DA PÁGINA (sem mudanças) ---
+# --- CONFIGURAÇÃO DA PÁGINA ---
 try:
     favicon = Image.open("Marca Águia Florestal-02.png")
 except FileNotFoundError:
-    favicon = "📋"
-st.set_page_config(page_title="Inspeção de Qualidade", page_icon=favicon, layout="wide", initial_sidebar_state="collapsed")
+    favicon = "📋" 
+st.set_page_config(
+    page_title="Inspeção de Qualidade",
+    page_icon=favicon,
+    layout="wide",
+    initial_sidebar_state="collapsed"
+)
 
-# --- CSS CUSTOMIZADO (sem mudanças) ---
+# --- FUNÇÃO PARA CARREGAR CSS CUSTOMIZADO ---
 def load_custom_css():
-    primary_color = "#20643F"
-    secondary_color = "#2E8B57"
+    primary_color = "#20643F" # Verde Principal
+    secondary_color = "#2E8B57" # Verde Secundário
+    
     st.markdown(f"""
         <style>
             #MainMenu, footer {{ visibility: hidden; }}
@@ -37,51 +43,44 @@ def load_custom_css():
         </style>
     """, unsafe_allow_html=True)
 
-# --- INICIALIZAÇÃO E FUNÇÕES DO BACKEND ---
+# --- INICIALIZAÇÃO DO SESSION STATE ---
 if 'current_step' not in st.session_state: st.session_state.current_step = 1
 if 'form_data' not in st.session_state: st.session_state.form_data = {}
 
-# --- NOVA FUNÇÃO DE UPLOAD PARA O GOOGLE DRIVE ---
+# --- FUNÇÕES DE BACKEND ---
+
 def upload_file_to_drive(file_object, creds):
     """Faz o upload de um objeto de arquivo para o Google Drive e retorna o link compartilhável."""
     try:
-        # Autenticação com o PyDrive2
         gauth = GoogleAuth()
         gauth.credentials = creds
         drive = GoogleDrive(gauth)
+        
+        # !! IMPORTANTE !! SUBSTITUA PELO ID DA SUA PASTA DO GOOGLE DRIVE!
+        DRIVE_FOLDER_ID = "SEU_ID_DA_PASTA_AQUI" 
 
-        # ID da pasta do Google Drive para onde as fotos serão enviadas
-        # SUBSTITUA PELO ID DA SUA PASTA!
-        DRIVE_FOLDER_ID = "1a2b3c4d5e6f7g8h9i0j_kLmM" # <-- COLOQUE O ID DA SUA PASTA AQUI
-
-        # Converte o objeto de arquivo do Streamlit para um que o PyDrive2 entenda
         file_object.seek(0)
         file_bytes = io.BytesIO(file_object.read())
         
-        # Cria o arquivo no Google Drive
         drive_file = drive.CreateFile({
             'title': file_object.name,
             'parents': [{'id': DRIVE_FOLDER_ID}]
         })
         drive_file.content = file_bytes
         drive_file.Upload()
-        
-        # Define a permissão para que qualquer pessoa com o link possa ver
         drive_file.InsertPermission({'type': 'anyone', 'role': 'reader', 'value': 'anyone'})
-
-        return drive_file['alternateLink'] # Retorna o link de visualização
+        return drive_file['alternateLink']
     except Exception as e:
         st.error(f"Erro no upload para o Drive: {e}")
         return None
 
-# --- FUNÇÃO DE ENVIO PARA O GOOGLE SHEETS (ATUALIZADA) ---
 def submit_data_to_sheets_and_drive(data, fotos_carregadas):
+    """Faz upload de fotos para o Drive e envia dados para o Sheets."""
     try:
         SCOPES = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
         creds_dict = dict(st.secrets["gcp_service_account"])
         creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
         
-        # 1. Faz o upload das fotos e obtém os links
         links_das_fotos = []
         if fotos_carregadas:
             for foto in fotos_carregadas:
@@ -89,10 +88,9 @@ def submit_data_to_sheets_and_drive(data, fotos_carregadas):
                 if link:
                     links_das_fotos.append(link)
         
-        # Substitui o nome do arquivo pelo link na linha de dados
+        # A última coluna da lista `data` é o placeholder para as fotos.
         data[-1] = ", ".join(links_das_fotos) if links_das_fotos else "Nenhuma foto enviada"
 
-        # 2. Envia os dados para a planilha
         gc = gspread.authorize(creds)
         sh = gc.open_by_key("1cG1KTzTUTf6A_DhWC6NIwRdAdLjaCTUYr9VgS4X03fU").worksheet("Base")
         sh.append_row(data)
@@ -101,8 +99,8 @@ def submit_data_to_sheets_and_drive(data, fotos_carregadas):
     except Exception as e:
         return False, str(e)
 
-# --- RENDERIZAÇÃO DAS ETAPAS ---
-# render_step_1 e render_step_2 não mudam.
+# --- FUNÇÕES PARA RENDERIZAR CADA ETAPA ---
+
 def render_step_1():
     st.subheader("Etapa 1: Identificação da Inspeção")
     with st.form("step1_form"):
@@ -113,6 +111,7 @@ def render_step_1():
         with col2:
             lote = st.text_input("LOTE (ano/semana)*", value=st.session_state.form_data.get('lote', ''))
             plaina = st.text_input("Plaina", value=st.session_state.form_data.get('plaina', ''))
+        
         if st.form_submit_button("Próximo ➡️"):
             if not email or not responsavel or not lote:
                 st.warning("Os campos com * são obrigatórios.")
@@ -124,30 +123,51 @@ def render_step_1():
 def render_step_2():
     st.subheader("Etapa 2: Dimensões e Enfardamento")
     with st.form("step2_form"):
-        # ... (código dos campos da etapa 2, sem mudanças)
-        enfardamento_pecas = st.text_input("Número de peças/camada", value=st.session_state.form_data.get('enfardamento_pecas', ''))
-        enfardamento_dimensoes = st.text_input("Dimensões das peças", value=st.session_state.form_data.get('enfardamento_dimensoes', ''))
+        enfardamento_pecas = st.text_input("Enfardamento - Número de peças/camada A (20) ; AF (17) ; AG (13) ; Lamar (29)", value=st.session_state.form_data.get('enfardamento_pecas', ''))
+        enfardamento_dimensoes = st.text_input("Enfardamento Dimensões das peças", value=st.session_state.form_data.get('enfardamento_dimensoes', ''))
         st.divider()
         col1, col2, col3 = st.columns(3)
-        with col1: e1 = st.number_input("E1 (mm)", value=st.session_state.form_data.get('e1', 0.0), format="%.2f")
-        with col2: l1 = st.number_input("L1 (mm)", value=st.session_state.form_data.get('l1', 0.0), format="%.2f")
-        # ... (restante dos campos)
+        with col1:
+            st.markdown("**Espessura (E)**")
+            e1 = st.number_input("E1 (mm) Entrada da plaina", value=st.session_state.form_data.get('e1', 0.0), format="%.2f", step=0.01)
+            e2 = st.number_input("E2 (mm) Meio da tábua", value=st.session_state.form_data.get('e2', 0.0), format="%.2f", step=0.01)
+            e3 = st.number_input("E3 (mm) Saída da plaina", value=st.session_state.form_data.get('e3', 0.0), format="%.2f", step=0.01)
+        with col2:
+            st.markdown("**Largura (L)**")
+            l1 = st.number_input("L1 (mm) Entrada da plaina", value=st.session_state.form_data.get('l1', 0.0), format="%.2f", step=0.01)
+            l2 = st.number_input("L2 (mm) Meio da tabua", value=st.session_state.form_data.get('l2', 0.0), format="%.2f", step=0.01)
+            l3 = st.number_input("L3 (mm) Saída da plaina", value=st.session_state.form_data.get('l3', 0.0), format="%.2f", step=0.01)
+        with col3:
+            st.markdown("**Comprimento e Umidade**")
+            comprimento = st.number_input("Comprimento (mm)", value=st.session_state.form_data.get('comprimento', 0.0), format="%.2f", step=0.01)
+            umidade = st.number_input("Umidade (8% a 16%)", value=st.session_state.form_data.get('umidade', 0.0), min_value=0.0, max_value=100.0, format="%.1f", step=0.1)
+        
         nav_cols = st.columns([1, 1, 6])
         if nav_cols[0].form_submit_button("⬅️ Voltar"):
-            st.session_state.current_step = 1
-            st.rerun()
+            st.session_state.current_step = 1; st.rerun()
         if nav_cols[1].form_submit_button("Próximo ➡️"):
-            st.session_state.form_data.update({'enfardamento_pecas': enfardamento_pecas, 'enfardamento_dimensoes': enfardamento_dimensoes, 'e1': e1, 'l1': l1})
+            st.session_state.form_data.update({
+                'enfardamento_pecas': enfardamento_pecas, 'enfardamento_dimensoes': enfardamento_dimensoes, 
+                'e1': e1, 'e2': e2, 'e3': e3, 'l1': l1, 'l2': l2, 'l3': l3, 
+                'comprimento': comprimento, 'umidade': umidade
+            })
             st.session_state.current_step = 3
             st.rerun()
-            
-# FUNÇÃO RENDER_STEP_3 ATUALIZADA
+
 def render_step_3():
     st.subheader("Etapa 3: Inspeção Visual e Envio Final")
     with st.form("step3_form"):
-        # ... (código dos campos de inspeção visual, sem mudanças)
         options = ["Conforme", "Não Conforme", "Não Aplicável"]
-        col1, col2 = st.columns(2); azulamento = col1.radio("Azulamento", options, horizontal=True)
+        col1, col2 = st.columns(2)
+        with col1:
+            azulamento = st.radio("Inspeção visual [Azulamento]", options, horizontal=True)
+            tortuosidade = st.radio("Inspeção visual [Tortuosidade]", options, horizontal=True)
+            no_morto = st.radio("Inspeção visual [Nó morto]", options, horizontal=True)
+            esmoado = st.radio("Inspeção visual [Esmoado]", options, horizontal=True)
+        with col2:
+            no_gravata = st.radio("Inspeção visual [Nó gravata]", options, horizontal=True)
+            marcas = st.radio("Inspeção visual [Marcas de ferramenta]", options, horizontal=True)
+            pontuacao = st.number_input("Pontuação", min_value=0, max_value=100, step=1)
         
         st.divider()
         st.subheader("Fotos da Inspeção")
@@ -158,22 +178,27 @@ def render_step_3():
         if nav_cols[0].form_submit_button("⬅️ Voltar"):
             st.session_state.current_step = 2; st.rerun()
         if nav_cols[2].form_submit_button("✔️ SUBMETER INSPEÇÃO"):
-            with st.spinner("Enviando dados e fazendo upload das imagens..."):
+            with st.spinner("Enviando dados e fazendo upload das imagens... Por favor, aguarde."):
                 fotos_carregadas = []
-                if foto_camera is not None:
+                if foto_camera:
                     foto_camera.name = f"foto_camera_{datetime.now().strftime('%Y%m%d_%H%M%S')}.jpg"
                     fotos_carregadas.append(foto_camera)
                 if fotos_galeria:
                     fotos_carregadas.extend(fotos_galeria)
                 
-                # Prepara a linha de dados (o campo de fotos é um placeholder por enquanto)
                 now = datetime.now()
-                final_data_row = [now.isoformat(), now.strftime("%Y-%m-%d"), now.strftime("%H:%M:%S"),
-                                  st.session_state.form_data.get('email'), st.session_state.form_data.get('responsavel'),
-                                  # ... (todos os outros campos)
-                                  azulamento, "placeholder_para_fotos"]
+                final_data_row = [
+                    now.isoformat(), now.strftime("%Y-%m-%d"), now.strftime("%H:%M:%S"),
+                    st.session_state.form_data.get('email'), st.session_state.form_data.get('responsavel'),
+                    st.session_state.form_data.get('lote'), st.session_state.form_data.get('plaina'),
+                    st.session_state.form_data.get('enfardamento_pecas'), st.session_state.form_data.get('enfardamento_dimensoes'),
+                    st.session_state.form_data.get('e1'), st.session_state.form_data.get('e2'), st.session_state.form_data.get('e3'),
+                    st.session_state.form_data.get('l1'), st.session_state.form_data.get('l2'), st.session_state.form_data.get('l3'),
+                    st.session_state.form_data.get('comprimento'), st.session_state.form_data.get('umidade'),
+                    azulamento, tortuosidade, no_morto, esmoado, no_gravata, marcas, pontuacao,
+                    "placeholder_para_fotos"
+                ]
                 
-                # Chama a nova função de envio unificada
                 success, error_message = submit_data_to_sheets_and_drive(final_data_row, fotos_carregadas)
                 
                 if success:
@@ -184,15 +209,20 @@ def render_step_3():
 def render_success_step():
     st.success("🎉 Inspeção registrada com sucesso!")
     st.balloons()
+    st.markdown("Obrigado por preencher o formulário. Você pode iniciar uma nova inspeção clicando no botão abaixo.")
     if st.button("Iniciar Nova Inspeção"):
         st.session_state.current_step = 1; st.session_state.form_data = {}; st.rerun()
 
-# --- LÓGICA PRINCIPAL DE RENDERIZAÇÃO (com a logo) ---
+# --- LÓGICA PRINCIPAL DE RENDERIZAÇÃO ---
 load_custom_css()
+
 col1, col2, col3 = st.columns([1, 2, 1])
 with col2:
-    try: st.image(Image.open("logo_horizontal.png"))
-    except: st.title("📋 Formulário de Inspeção")
+    try:
+        st.image(Image.open("logo_horizontal.png"), use_container_width=True)
+    except FileNotFoundError:
+        st.title("📋 Formulário de Inspeção de Qualidade")
+
 st.markdown("<br>", unsafe_allow_html=True)
 st.progress((st.session_state.current_step - 1) / 3)
 
