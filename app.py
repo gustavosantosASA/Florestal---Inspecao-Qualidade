@@ -102,17 +102,18 @@ if 'current_step' not in st.session_state:
 if 'form_data' not in st.session_state:
     st.session_state.form_data = {}
 
+# Versão atualizada da função para usar os "Secrets"
 def submit_data_to_sheets(data):
     try:
         SCOPES = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
-        creds = Credentials.from_service_account_file("google_credentials.json", scopes=SCOPES)
+        # Linha que lê as credenciais do Streamlit Cloud Secrets:
+        creds = Credentials.from_service_account_info(st.secrets, scopes=SCOPES)
         gc = gspread.authorize(creds)
         sh = gc.open_by_key("1cG1KTzTUTf6A_DhWC6NIwRdAdLjaCTUYr9VgS4X03fU").worksheet("Base")
         sh.append_row(data)
         return True, None
-    except FileNotFoundError:
-        return False, "Arquivo de credenciais (google_credentials.json) não encontrado."
     except Exception as e:
+        # Erro mais genérico para cobrir falhas de conexão ou autenticação
         return False, str(e)
 
 # --- FUNÇÕES PARA RENDERIZAR CADA ETAPA (sem mudanças na lógica) ---
