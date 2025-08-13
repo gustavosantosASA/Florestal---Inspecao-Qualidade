@@ -22,26 +22,85 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# --- FUNÇÃO PARA CARREGAR CSS CUSTOMIZADO (sem mudanças) ---
+# --- FUNÇÃO CSS ATUALIZADA ---
 def load_custom_css():
     primary_color = "#20643F"
-    secondary_color = "#2E8B57"
+    secondary_color = "#1B4E33"
+    background_color = "#F9FAF9"
+
     st.markdown(f"""
         <style>
-            #MainMenu, footer {{ visibility: hidden; }}
+            /* Esconde menu e rodapé padrão do Streamlit */
+            #MainMenu, footer {{visibility: hidden;}}
+
+            /* Fundo geral */
+            section[data-testid="stAppViewContainer"] {{
+                background-color: {background_color};
+                padding-top: 1rem;
+                padding-bottom: 2rem;
+            }}
+
+            /* Container central em formato de card */
             section[data-testid="stAppViewContainer"] > div:first-child > div:first-child {{
-                background-color: #FFFFFF; padding: 1.5rem 2rem 2rem 2rem; border-radius: 15px;
-                box-shadow: 0 6px 15px rgba(0,0,0,0.06); border: 1px solid #e6e6e6;
+                background-color: #FFFFFF;
+                padding: 1.5rem 2rem 2rem 2rem;
+                border-radius: 15px;
+                box-shadow: 0 6px 15px rgba(0,0,0,0.06);
+                border: 1px solid #e6e6e6;
             }}
+
+            /* Títulos */
+            h1, h2, h3, h4 {{
+                color: {primary_color};
+                font-weight: 700;
+            }}
+            h1 {{text-align: center; font-size: 1.8rem; margin-bottom: 1rem;}}
+            h2 {{margin-top: 1rem; font-size: 1.3rem; border-left: 4px solid {primary_color}; padding-left: 0.5rem;}}
+
+            /* Botões */
             .stButton > button {{
-                width: 100%; height: 3.2rem; font-size: 1.1rem; font-weight: bold; border-radius: 8px;
-                border: none; color: white; background-color: {primary_color}; transition: background-color 0.2s ease;
+                width: 100%;
+                height: 3rem;
+                font-size: 1.05rem;
+                font-weight: bold;
+                border-radius: 8px;
+                border: none;
+                background-color: {primary_color};
+                color: white;
+                transition: all 0.25s ease;
             }}
-            .stButton > button:hover {{ background-color: {secondary_color}; color: white; }}
-            h1 {{ color: {primary_color}; font-weight: bold; text-align: center; }}
-            .stProgress > div > div > div > div {{ background-color: {primary_color}; }}
+            .stButton > button:hover {{
+                background-color: {secondary_color};
+                transform: translateY(-1px);
+                box-shadow: 0px 3px 8px rgba(0,0,0,0.15);
+            }}
+
+            /* Inputs */
+            input, textarea, select {{
+                border: 1px solid #d9d9d9 !important;
+                border-radius: 6px !important;
+            }}
+
+            /* Barra de progresso */
+            .stProgress > div > div > div > div {{
+                background-color: {primary_color};
+            }}
+
+            /* Radio buttons */
+            div[data-baseweb="radio"] label span {{
+                color: {primary_color} !important;
+                font-weight: 500;
+            }}
+
+            /* Camera input */
+            [data-testid="stCameraInput"] {{
+                border-radius: 10px;
+                border: 2px dashed {primary_color};
+                padding: 8px;
+            }}
         </style>
     """, unsafe_allow_html=True)
+
 
 # --- INICIALIZAÇÃO DO SESSION STATE (sem mudanças) ---
 if 'current_step' not in st.session_state: st.session_state.current_step = 1
